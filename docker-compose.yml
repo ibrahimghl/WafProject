@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  dvwa:
+    image: vulnerables/web-dvwa
+    container_name: dvwa
+    ports:
+      - "8081:80"
+    networks:
+      - waf-net
+    restart: unless-stopped
+
+  waf:
+    image: owasp/modsecurity-crs:3.3.5-nginx-202308071108
+    container_name: waf
+    depends_on:
+      - dvwa
+    ports:
+      - "8080:80"
+    networks:
+      - waf-net
+    volumes:
+      - ./waf/conf/main.conf:/etc/modsecurity/modsecurity.conf
+      - ./waf/conf/default.conf:/etc/nginx/conf.d/default.conf
+      - ./waf/conf/includes:/etc/nginx/includes
+      - ./waf/owasp-crs:/etc/modsecurity/owasp-crs:ro
+      - ./waf/logs:/var/log/nginx
+      - ./waf/cache:/var/cache/modsecurity
+    environment:
+      - SERVER_NAME=dvwa
+      - BACKEND=http://dvwa:80
+      - PORT=80
+      - SSL_PORT=443
+      - NGINX_ALWAYS_TLS_REDIRECT=off
+      - PROXY_SSL_CERT=/etc/nginx/conf/server.crt
+      - PROXY_SSL_CERT_KEY=/etc/nginx/conf/server.key
+      - PROXY_SSL_DH_BITS=2048
+      - PROXY_SSL_PROTOCOLS=TLSv1.2 TLSv1.3
+      - PROXY_SSL_CIPHERS=ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
+      - PROXY_SSL_PREFER_CIPHERS=off
+      - PROXY_SSL_OCSP_STAPLING=off
+      - PROXY_SSL_VERIFY=off
+    restart: unless-stopped
+
+networks:
+  waf-net:
+    driver: bridge
